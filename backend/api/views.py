@@ -162,7 +162,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             shopping_list.append(
                 f'\n{ingredients.name} - {amount}',
                 f'{ingredients.measurement_unit}'
-                )
+            )
         response = HttpResponse(shopping_list, content_type='text/plain')
         response['Content-Disposition'] = \
             'attachment; filename="shopping_cart.txt"'
