@@ -1,4 +1,4 @@
-from django.db.models import Sum
+from django.db.models import F, Sum
 from django.shortcuts import HttpResponse, get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
@@ -13,9 +13,8 @@ from foodgram.models import (Favorites, Ingredient, IngredientForRecipe,
 from .filters import RecipeFilter
 from .pagination import PageNumberLimitPagination
 from .serializers import (IngredientSerializer, RecipeCreateSerializer,
-                          RecipeSerializer,
-                          SubscriptionSerializer, TagSerializer,
-                          UserSubscribeSerializer)
+                          RecipeSerializer, SubscriptionSerializer,
+                          TagSerializer, UserSubscribeSerializer)
 
 
 class UserViewSet(UserViewSet):
@@ -54,7 +53,7 @@ class UserViewSet(UserViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save(pk=id)
             return Response(status=status.HTTP_201_CREATED)
-        elif request.method == 'DELETE':
+        if request.method == 'DELETE':
             subscription = get_object_or_404(
                 Subscriptions, user=self.request.user,
                 author=get_object_or_404(User, id=id)
@@ -108,10 +107,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save(id=pk)
             return Response(status=status.HTTP_201_CREATED)
-        if not Favorites.objects.filter(user=request.user,
-                                        recipe=recipe).exists():
-            return Response('Рецепт уже добавлен в избранное.',
-                            status=status.HTTP_400_BAD_REQUEST)
         if request.method == 'DELETE':
             get_object_or_404(
                 Favorites, user=request.user,
@@ -133,10 +128,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save(id=pk)
             return Response(status=status.HTTP_201_CREATED)
-        if not ShoppingCart.objects.filter(user=request.user,
-                                           recipe=recipe).exists():
-            return Response('Рецепт уже добавлен в список покупок.',
-                            status=status.HTTP_400_BAD_REQUEST)
         if request.method == 'DELETE':
             get_object_or_404(
                 ShoppingCart, user=request.user,
@@ -150,11 +141,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def download_shopping_cart(self, request):
         """Отправка файла со списком покупок."""
         user = request.user
-        shopping_cart = ShoppingCart.objects.filter(user=user)
-        recipe_id = [i.recipe for i in shopping_cart]
         amount_list = IngredientForRecipe.objects.filter(
-            recipe__in=recipe_id
-        ).values('ingredient').annotate(amount=Sum('amount'))
+            recipe__shopping_cart__user=user
+        ).annotate(name=F('ingredient__name'),
+                   unit=F('ingredient__measurement_unit'),
+                   i_amount=Sum('amount'))
         shopping_list = ['Список покупок:\n']
         for i in amount_list:
             ingredients = Ingredient.objects.get(pk=i['ingredient'])

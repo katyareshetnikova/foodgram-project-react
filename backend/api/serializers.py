@@ -127,7 +127,9 @@ class IngredientSerializer(serializers.ModelSerializer):
 class IngredientRecipeSerializer(serializers.ModelSerializer):
     """Сериализатор количества ингредиентов для рецепта."""
 
-    id = serializers.IntegerField(source='ingredient.id')
+    id = serializers.PrimaryKeyRelatedField(source='ingredient.id',
+                                            read_only=True
+                                            )
     name = serializers.StringRelatedField(source='ingredient.name')
     measurement_unit = serializers.StringRelatedField(
         source='ingredient.measurement_unit'
@@ -235,3 +237,36 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             instance,
             context={'request': request}
         ).data
+
+
+class Favorite_ShoppingCart_Serializer(serializers.Serializer):
+    """Сериализатор добавления рецепта в избранное/список покупок."""
+
+    def validate_favorite(self, data):
+        recipe_id = self.context['recipe_id']
+        user = self.context['request'].user
+        if Favorites.objects.filter(
+            user=user, recipe_id=recipe_id
+        ).exists():
+            raise serializers.ValidationError(
+                'Рецепт уже добавлен в избранное.'
+            )
+        return data
+
+    def validate_shopping_cart(self, data):
+        recipe_id = self.context['recipe_id']
+        user = self.context['request'].user
+        if ShoppingCart.objects.filter(
+            user=user, recipe_id=recipe_id
+        ).exists():
+            raise serializers.ValidationError(
+                'Рецепт уже добавлен в список покупок.'
+            )
+        return data
+
+    def create(self, validated_data):
+        user = self.context.get('request').user
+        recipe = get_object_or_404(Recipe, pk=validated_data['pk'])
+        Favorites.objects.create(user=user, recipe=recipe)
+        serializer = RecipeShortSerializer(recipe)
+        return serializer.data
