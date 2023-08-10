@@ -2,10 +2,9 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from djoser.serializers import UserCreateSerializer, UserSerializer
 from drf_base64.fields import Base64ImageField
-from rest_framework import serializers
-
 from foodgram.models import (Favorites, Ingredient, IngredientForRecipe,
                              Recipe, ShoppingCart, Subscriptions, Tag)
+from rest_framework import serializers
 
 User = get_user_model()
 
@@ -147,8 +146,7 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     tags = TagSerializer(many=True, read_only=True)
     author = UserSerializer(read_only=True)
-    ingredients = IngredientRecipeSerializer(many=True,
-                                             source='ingredient_recipes')
+    ingredients = IngredientRecipeSerializer(many=True, source='recipes')
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
     image = Base64ImageField()
@@ -192,7 +190,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
     tags = serializers.PrimaryKeyRelatedField(many=True,
                                               queryset=Tag.objects.all())
     author = UserSerializer(read_only=True)
-    image = Base64ImageField()
+    image = Base64ImageField(required=True, allow_null=False)
 
     class Meta:
         model = Recipe
@@ -215,16 +213,14 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         return recipe
 
     def create(self, validated_data):
-        ingredients_data = validated_data.pop('ingredients')
+        ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
         recipe = Recipe.objects.create(**validated_data)
-        self.add_ingredients_and_tags(recipe, ingredients_data)
-        recipe.tags.set(tags)
-        return recipe
+        return self.add_ingredients_and_tags(tags, ingredients, recipe)
 
     def update(self, instance, validated_data):
         instance.ingredients.clear()
-        ingredients = validated_data.pop('recipes')
+        ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
         instance = super().update(instance, validated_data)
         return self.add_ingredients_and_tags(
@@ -239,34 +235,43 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         ).data
 
 
-class Favorite_ShoppingCart_Serializer(serializers.Serializer):
-    """Сериализатор добавления рецепта в избранное/список покупок."""
+class FavoriteSerializer(serializers.Serializer):
 
-    def validate_favorite(self, data):
-        recipe_id = self.context['recipe_id']
+    def validate(self, data):
         user = self.context['request'].user
-        if Favorites.objects.filter(
-            user=user, recipe_id=recipe_id
-        ).exists():
+        pk = self.context['recipe_id']
+
+        if Favorites.objects.filter(user=user,
+                                    recipe__id=pk).exists():
             raise serializers.ValidationError(
                 'Рецепт уже добавлен в избранное.'
             )
         return data
 
-    def validate_shopping_cart(self, data):
-        recipe_id = self.context['recipe_id']
+    def create(self, validated_data):
+        recipe = get_object_or_404(Recipe, pk=validated_data['id'])
         user = self.context['request'].user
-        if ShoppingCart.objects.filter(
-            user=user, recipe_id=recipe_id
-        ).exists():
+        Favorites.objects.create(user=user, recipe=recipe)
+        serializer = RecipeShortSerializer(recipe)
+        return serializer.data
+
+
+class ShoppingCartSerializer(serializers.Serializer):
+
+    def validate(self, data):
+        user = self.context['request'].user
+        pk = self.context['recipe_id']
+
+        if ShoppingCart.objects.filter(user=user,
+                                       recipe__id=pk).exists():
             raise serializers.ValidationError(
                 'Рецепт уже добавлен в список покупок.'
             )
         return data
 
     def create(self, validated_data):
-        user = self.context.get('request').user
-        recipe = get_object_or_404(Recipe, pk=validated_data['pk'])
-        Favorites.objects.create(user=user, recipe=recipe)
+        recipe = get_object_or_404(Recipe, pk=validated_data['id'])
+        user = self.context['request'].user
+        ShoppingCart.objects.create(user=user, recipe=recipe)
         serializer = RecipeShortSerializer(recipe)
         return serializer.data

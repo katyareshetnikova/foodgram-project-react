@@ -1,7 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.db import models
-
 from foodgram.validators import validator_username
 
 
@@ -166,14 +165,14 @@ class IngredientForRecipe(models.Model):
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
-        related_name='ingredient_recipes',
+        related_name='ingredients',
         verbose_name='Ингредиент',
     )
 
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
-        related_name='ingredient_recipes',
+        related_name='recipes',
         verbose_name='Рецепт',
     )
 
@@ -184,6 +183,7 @@ class IngredientForRecipe(models.Model):
     class Meta:
         verbose_name = 'Ингредиент в рецепте'
         verbose_name_plural = 'Ингредиенты в рецепте'
+        unique_together = ('recipe', 'ingredient')
 
 
 class ShoppingCart(models.Model):

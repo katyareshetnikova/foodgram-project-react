@@ -28,6 +28,9 @@ class IngredientAdmin(admin.ModelAdmin):
     list_filter = ('name',)
     empty_value_display = '-пусто-'
 
+    class RecipeIngredientInline(admin.TabularInline):
+        model = IngredientForRecipe
+
 
 class RecipeAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'author', 'favorites_amount',)
