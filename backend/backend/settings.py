@@ -155,7 +155,7 @@ REST_FRAMEWORK = {
     ],
 
     'DEFAULT_PAGINATION_CLASS': [
-        'api.pagination.PageNumberLimitPagination',
+        'rest_framework.pagination.LimitOffsetPagination',
     ],
     'PAGE_SIZE': 6,
 
